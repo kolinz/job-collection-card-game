@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理画面 | 職種コレクションゲーム</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+    button { cursor: pointer; border: none; font-family: inherit; }
+    input, select, textarea { font-family: inherit; }
+
+    /* ===== ログイン画面 ===== */
+    #login-screen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 24px;
+    }
+    .login-card {
+      background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+      padding: 32px; width: 100%; max-width: 360px;
+    }
+    .login-card h1 { font-size: 1.5rem; margin-bottom: 24px; text-align: center; }
+    .form-row { margin-bottom: 16px; }
+    .form-row label { display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 6px; }
+    .form-row input {
+      width: 100%; padding: 10px 12px;
+      background: #0f172a; border: 1px solid #334155;
+      border-radius: 8px; color: #e2e8f0; font-size: 1rem;
+    }
+    .form-row input:focus { outline: none; border-color: #6366f1; }
+
+    /* ===== 管理画面本体 ===== */
+    #admin-screen { display: none; }
+    .admin-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 24px; background: #1e293b; border-bottom: 1px solid #334155;
+    }
+    .admin-header h1 { font-size: 1.1rem; font-weight: 600; }
+    .tab-nav { display: flex; gap: 4px; padding: 12px 24px 0; background: #0f172a; border-bottom: 1px solid #334155; overflow-x: auto; }
+    .tab-btn {
+      padding: 8px 16px; border-radius: 8px 8px 0 0;
+      background: #1e293b; color: #94a3b8; font-size: 0.9rem;
+      border: 1px solid #334155; border-bottom: none; white-space: nowrap;
+    }
+    .tab-btn.active { background: #0f172a; color: #e2e8f0; border-color: #475569; }
+    .tab-content { display: none; padding: 24px; }
+    .tab-content.active { display: block; }
+
+    /* ===== テーブル ===== */
+    .data-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 0.9rem; }
+    .data-table th { text-align: left; padding: 8px 12px; color: #64748b; font-weight: 500; border-bottom: 1px solid #334155; }
+    .data-table td { padding: 8px 12px; border-bottom: 1px solid #1e293b; }
+    .data-table tr:hover td { background: #1e293b; }
+
+    /* ===== ボタン ===== */
+    .btn { padding: 8px 16px; border-radius: 6px; font-size: 0.85rem; transition: background .15s; }
+    .btn-primary { background: #6366f1; color: #fff; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-danger { background: #991b1b; color: #fff; }
+    .btn-danger:hover { background: #7f1d1d; }
+    .btn-secondary { background: #334155; color: #e2e8f0; }
+    .btn-secondary:hover { background: #475569; }
+    .btn-sm { padding: 4px 10px; font-size: 0.8rem; }
+    .btn-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+
+    /* ===== モーダル ===== */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.7); z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+      width: 90%; max-width: 600px; max-height: 85vh;
+      display: flex; flex-direction: column;
+    }
+    .modal-header {
+      padding: 16px 20px; border-bottom: 1px solid #334155;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .modal-header h3 { font-size: 1rem; font-weight: 600; }
+    .modal-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+    .modal-footer { padding: 12px 20px; border-top: 1px solid #334155; display: flex; gap: 8px; justify-content: flex-end; }
+
+    .field-row { margin-bottom: 14px; }
+    .field-row label { display: block; font-size: 0.82rem; color: #94a3b8; margin-bottom: 5px; }
+    .field-row input, .field-row select, .field-row textarea {
+      width: 100%; padding: 8px 10px;
+      background: #0f172a; border: 1px solid #334155;
+      border-radius: 6px; color: #e2e8f0; font-size: 0.9rem;
+    }
+    .field-row input.error { border-color: #ef4444; }
+    .field-row .error-msg { font-size: 0.78rem; color: #ef4444; margin-top: 4px; }
+    textarea { resize: vertical; min-height: 60px; }
+
+    /* チェックボックスリスト */
+    .check-list {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 4px; max-height: 200px; overflow-y: auto;
+      border: 1px solid #334155; border-radius: 6px; padding: 8px;
+      background: #0f172a;
+    }
+    .check-list label { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; cursor: pointer; padding: 2px 0; }
+    .check-list input[type="checkbox"] { width: auto; }
+
+    /* 配布比率 */
+    .ratio-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .ratio-row label { color: #94a3b8; font-size: 0.85rem; width: 120px; }
+    .ratio-row input { width: 80px; }
+    .ratio-total { font-size: 0.85rem; padding: 6px 10px; background: #0f172a; border-radius: 6px; }
+
+    .alert { padding: 10px 14px; border-radius: 6px; font-size: 0.85rem; margin-bottom: 12px; }
+    .alert.error { background: #450a0a; border: 1px solid #991b1b; color: #fca5a5; }
+    .alert.success { background: #052e16; border: 1px solid #166534; color: #86efac; }
+  </style>
+</head>
+<body>
+
+<!-- ===== ログイン画面 ===== -->
+<div id="login-screen">
+  <div class="login-card">
+    <h1>管理画面</h1>
+    <div id="login-error" class="alert error" style="display:none"></div>
+    <div class="form-row">
+      <label>ユーザー名</label>
+      <input type="text" id="login-user" placeholder="admin">
+    </div>
+    <div class="form-row">
+      <label>パスワード</label>
+      <input type="password" id="login-pass" placeholder="••••••••">
+    </div>
+    <button class="btn btn-primary" style="width:100%;padding:12px" id="login-btn">ログインする</button>
+  </div>
+</div>
+
+<!-- ===== 管理画面本体 ===== -->
+<div id="admin-screen">
+  <div class="admin-header">
+    <h1>管理画面 — 職種コレクション v2.0-B</h1>
+    <button class="btn btn-secondary btn-sm" id="logout-btn">ログアウト</button>
+  </div>
+
+  <div class="tab-nav" id="tab-nav">
+    <button class="tab-btn active" data-tab="categories">職種カード</button>
+    <button class="tab-btn" data-tab="skills">スキルカード</button>
+    <button class="tab-btn" data-tab="missions">ミッションカード</button>
+    <button class="tab-btn" data-tab="distribution">配布比率</button>
+    <button class="tab-btn" data-tab="skill-types">スキル区分</button>
+    <button class="tab-btn" data-tab="mission-categories">ミッション区分</button>
+  </div>
+
+  <div id="tab-categories" class="tab-content active">
+    <div class="btn-group">
+      <button class="btn btn-primary" id="add-category-btn">+ 新規作成</button>
+      <label class="btn btn-secondary" style="cursor:pointer">CSVインポート<input type="file" accept=".csv" id="import-categories" style="display:none"></label>
+      <button class="btn btn-secondary" id="export-categories">CSVエクスポート</button>
+    </div>
+    <div id="alert-categories"></div>
+    <table class="data-table">
+      <thead><tr><th>ID</th><th>名前(日)</th><th>名前(英)</th><th>必要スキル数</th><th>必要ミッション数</th><th>操作</th></tr></thead>
+      <tbody id="categories-tbody"></tbody>
+    </table>
+  </div>
+
+  <div id="tab-skills" class="tab-content">
+    <div class="btn-group">
+      <button class="btn btn-primary" id="add-skill-btn">+ 新規作成</button>
+      <label class="btn btn-secondary" style="cursor:pointer">CSVインポート<input type="file" accept=".csv" id="import-skills" style="display:none"></label>
+      <button class="btn btn-secondary" id="export-skills">CSVエクスポート</button>
+    </div>
+    <div id="alert-skills"></div>
+    <table class="data-table">
+      <thead><tr><th>ID</th><th>名前(日)</th><th>名前(英)</th><th>スキル区分</th><th>操作</th></tr></thead>
+      <tbody id="skills-tbody"></tbody>
+    </table>
+  </div>
+
+  <div id="tab-missions" class="tab-content">
+    <div class="btn-group">
+      <button class="btn btn-primary" id="add-mission-btn">+ 新規作成</button>
+      <label class="btn btn-secondary" style="cursor:pointer">CSVインポート<input type="file" accept=".csv" id="import-missions" style="display:none"></label>
+      <button class="btn btn-secondary" id="export-missions">CSVエクスポート</button>
+    </div>
+    <div id="alert-missions"></div>
+    <table class="data-table">
+      <thead><tr><th>ID</th><th>名前(日)</th><th>名前(英)</th><th>ミッション区分</th><th>有効</th><th>操作</th></tr></thead>
+      <tbody id="missions-tbody"></tbody>
+    </table>
+  </div>
+
+  <div id="tab-distribution" class="tab-content">
+    <h3 style="margin-bottom:16px">配布比率設定</h3>
+    <div id="alert-distribution"></div>
+    <div class="ratio-row">
+      <label>スキルカード (%)</label>
+      <input type="number" id="skill-ratio" min="0" max="100" value="70">
+    </div>
+    <div class="ratio-row">
+      <label>ミッションカード (%)</label>
+      <input type="number" id="mission-ratio" min="0" max="100" value="30">
+    </div>
+    <div class="ratio-row">
+      <label>合計</label>
+      <span class="ratio-total" id="ratio-total">100</span>
+    </div>
+    <button class="btn btn-primary" id="save-distribution-btn">保存する</button>
+  </div>
+
+  <div id="tab-skill-types" class="tab-content">
+    <div class="btn-group">
+      <button class="btn btn-primary" id="add-skill-type-btn">+ 新規作成</button>
+    </div>
+    <div id="alert-skill-types"></div>
+    <table class="data-table">
+      <thead><tr><th>ID</th><th>名前(日)</th><th>名前(英)</th><th>操作</th></tr></thead>
+      <tbody id="skill-types-tbody"></tbody>
+    </table>
+  </div>
+
+  <div id="tab-mission-categories" class="tab-content">
+    <div class="btn-group">
+      <button class="btn btn-primary" id="add-mission-category-btn">+ 新規作成</button>
+    </div>
+    <div id="alert-mission-categories"></div>
+    <table class="data-table">
+      <thead><tr><th>ID</th><th>名前(日)</th><th>名前(英)</th><th>操作</th></tr></thead>
+      <tbody id="mission-categories-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== 汎用モーダル ===== -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">編集</h3>
+      <button class="btn btn-secondary btn-sm" id="modal-close-btn">×</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modal-cancel-btn">キャンセル</button>
+      <button class="btn btn-primary" id="modal-save-btn">保存する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ---------------------------------------------------------------------------
+// 状態
+// ---------------------------------------------------------------------------
+let token = localStorage.getItem('admin_token') || '';
+let allSkills = [], allMissions = [], allSkillTypes = [], allMissionCats = [], allCategories = [];
+
+// ---------------------------------------------------------------------------
+// API ヘルパー
+// ---------------------------------------------------------------------------
+async function api(method, path, body) {
+  const opts = { method, headers: { Authorization: `Bearer ${token}` } };
+  if (body !== undefined) {
+    if (typeof body === 'string') {
+      opts.headers['Content-Type'] = 'text/csv';
+      opts.body = body;
+    } else {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+  }
+  const res = await fetch(path, opts);
+  if (res.status === 401) { logout(); return null; }
+  return res.json();
+}
+
+function showAlert(containerId, msg, type = 'error') {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = `<div class="alert ${type}">${escHtml(msg)}</div>`;
+  setTimeout(() => { el.innerHTML = ''; }, 4000);
+}
+
+function escHtml(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ---------------------------------------------------------------------------
+// ログイン・ログアウト
+// ---------------------------------------------------------------------------
+function logout() {
+  token = '';
+  localStorage.removeItem('admin_token');
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('admin-screen').style.display = 'none';
+}
+
+async function checkAuth() {
+  if (!token) return false;
+  const res = await api('GET', '/api/admin/categories');
+  return res !== null;
+}
+
+document.getElementById('login-btn').addEventListener('click', async () => {
+  const username = document.getElementById('login-user').value.trim();
+  const password = document.getElementById('login-pass').value;
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    token = data.token;
+    localStorage.setItem('admin_token', token);
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('admin-screen').style.display = 'block';
+    loadAll();
+  } else {
+    const el = document.getElementById('login-error');
+    el.textContent = 'ユーザー名またはパスワードが正しくありません';
+    el.style.display = 'block';
+  }
+});
+
+document.getElementById('logout-btn').addEventListener('click', logout);
+
+// Enter キーでログイン
+['login-user', 'login-pass'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('login-btn').click();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// タブ切り替え
+// ---------------------------------------------------------------------------
+document.getElementById('tab-nav').addEventListener('click', e => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === `tab-${btn.dataset.tab}`));
+  if (btn.dataset.tab === 'distribution') loadDistribution();
+});
+
+// ---------------------------------------------------------------------------
+// データ読み込み
+// ---------------------------------------------------------------------------
+async function loadAll() {
+  [allCategories, allSkills, allMissions, allSkillTypes, allMissionCats] = await Promise.all([
+    api('GET', '/api/admin/categories'),
+    api('GET', '/api/admin/skills'),
+    api('GET', '/api/admin/missions'),
+    api('GET', '/api/admin/skill-types'),
+    api('GET', '/api/admin/mission-categories'),
+  ]);
+  renderCategories();
+  renderSkills();
+  renderMissions();
+  renderSkillTypes();
+  renderMissionCategories();
+  loadDistribution();
+}
+
+async function loadDistribution() {
+  const res = await fetch('/api/settings/distribution');
+  const data = await res.json();
+  document.getElementById('skill-ratio').value = data.skillRatio ?? 70;
+  document.getElementById('mission-ratio').value = data.missionRatio ?? 30;
+  updateRatioTotal();
+}
+
+// ---------------------------------------------------------------------------
+// 職種カード
+// ---------------------------------------------------------------------------
+function renderCategories() {
+  const tbody = document.getElementById('categories-tbody');
+  tbody.innerHTML = (allCategories || []).map(c => `<tr>
+    <td>${c.id}</td>
+    <td>${escHtml(c.name_ja)}</td>
+    <td>${escHtml(c.name_en)}</td>
+    <td>${c.required_skill_count}</td>
+    <td>${c.required_mission_count}</td>
+    <td>
+      <button class="btn btn-secondary btn-sm" onclick="openCategoryModal(${c.id})">編集</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteCategory(${c.id})">削除</button>
+    </td>
+  </tr>`).join('');
+}
+
+window.openCategoryModal = async function(id) {
+  const cat = id ? allCategories.find(c => c.id === id) : null;
+  // レシピ取得
+  const recipes = await api('GET', '/api/cards/category-recipes');
+  const recipe  = id ? (recipes || []).find(r => r.id === id) : null;
+  const linkedSkills   = recipe?.linkedSkillIds   || [];
+  const linkedMissions = recipe?.linkedMissionIds || [];
+
+  const skillChecks = (allSkills || []).map(s =>
+    `<label><input type="checkbox" class="skill-check" value="${s.id}" ${linkedSkills.includes(s.id)?'checked':''}> ${escHtml(s.name_ja)}</label>`
+  ).join('');
+  const missChecks = (allMissions || []).map(m =>
+    `<label><input type="checkbox" class="mission-check" value="${m.id}" ${linkedMissions.includes(m.id)?'checked':''}> ${escHtml(m.name_ja)}</label>`
+  ).join('');
+
+  openModal(id ? '職種カード編集' : '職種カード新規作成', `
+    <div class="field-row"><label>名前（日本語）</label><input id="f-name-ja" value="${escHtml(cat?.name_ja||'')}"></div>
+    <div class="field-row"><label>名前（英語）</label><input id="f-name-en" value="${escHtml(cat?.name_en||'')}"></div>
+    <div class="field-row"><label>職種説明（マークダウン）</label><textarea id="f-desc-ja" rows="6" style="font-family:monospace;font-size:0.82rem">${escHtml(cat?.description_ja||'')}</textarea></div>
+    ${id ? `
+    <div class="field-row">
+      <label>紐づけるスキルカード</label>
+      <div class="check-list" id="skill-checks">${skillChecks}</div>
+    </div>
+    <div class="field-row">
+      <label>必要枚数（スキル）</label>
+      <input type="number" id="f-req-skill" min="1" value="${cat?.required_skill_count||1}">
+      <div class="error-msg" id="err-req-skill" style="display:none"></div>
+    </div>
+    <div class="field-row">
+      <label>紐づけるミッションカード</label>
+      <div class="check-list" id="mission-checks">${missChecks}</div>
+    </div>
+    <div class="field-row">
+      <label>必要枚数（ミッション）</label>
+      <input type="number" id="f-req-mission" min="1" value="${cat?.required_mission_count||1}">
+      <div class="error-msg" id="err-req-mission" style="display:none"></div>
+    </div>` : ''}
+  `, async () => {
+    const nameJa  = document.getElementById('f-name-ja').value.trim();
+    const nameEn  = document.getElementById('f-name-en').value.trim();
+    const descJa  = document.getElementById('f-desc-ja').value.trim() || null;
+    if (!nameJa || !nameEn) { alert('名前を入力してください'); return false; }
+
+    if (!id) {
+      const r = await api('POST', '/api/admin/categories', { name_ja: nameJa, name_en: nameEn, description_ja: descJa });
+      if (!r?.ok) return false;
+    } else {
+      // 名前・説明更新
+      const r = await api('PUT', `/api/admin/categories/${id}`, { name_ja: nameJa, name_en: nameEn, description_ja: descJa });
+      if (!r?.ok) return false;
+
+      // レシピ更新
+      const skillIds   = [...document.querySelectorAll('.skill-check:checked')].map(el => Number(el.value));
+      const missionIds = [...document.querySelectorAll('.mission-check:checked')].map(el => Number(el.value));
+      const rsc = Number(document.getElementById('f-req-skill').value);
+      const rmc = Number(document.getElementById('f-req-mission').value);
+
+      // クライアント側バリデーション
+      let valid = true;
+      if (rsc < 1 || rsc > skillIds.length) {
+        const errEl = document.getElementById('err-req-skill');
+        errEl.textContent = `必要枚数は選択したカード数（${skillIds.length}種）以下にしてください`;
+        errEl.style.display = 'block';
+        document.getElementById('f-req-skill').classList.add('error');
+        valid = false;
+      }
+      if (rmc < 1 || rmc > missionIds.length) {
+        const errEl = document.getElementById('err-req-mission');
+        errEl.textContent = `必要枚数は選択したカード数（${missionIds.length}種）以下にしてください`;
+        errEl.style.display = 'block';
+        document.getElementById('f-req-mission').classList.add('error');
+        valid = false;
+      }
+      if (!valid) return false;
+
+      const r2 = await api('PUT', `/api/admin/categories/${id}/recipe`, {
+        skillIds, missionIds, requiredSkillCount: rsc, requiredMissionCount: rmc,
+      });
+      if (!r2?.ok) { alert(r2?.error || 'エラー'); return false; }
+    }
+
+    allCategories = await api('GET', '/api/admin/categories');
+    renderCategories();
+    return true;
+  });
+};
+
+window.deleteCategory = async function(id) {
+  if (!confirm('削除しますか？')) return;
+  await api('DELETE', `/api/admin/categories/${id}`);
+  allCategories = await api('GET', '/api/admin/categories');
+  renderCategories();
+};
+
+document.getElementById('add-category-btn').addEventListener('click', () => openCategoryModal(null));
+
+// CSV エクスポート
+document.getElementById('export-categories').addEventListener('click', () => {
+  const headers = 'id,name_ja,name_en,required_skill_count,required_mission_count';
+  const rows = (allCategories||[]).map(c => `${c.id},${c.name_ja},${c.name_en},${c.required_skill_count},${c.required_mission_count}`);
+  downloadCsv('categories.csv', [headers, ...rows].join('\n'));
+});
+
+// CSV インポート
+document.getElementById('import-categories').addEventListener('change', async function() {
+  const text = await this.files[0].text();
+  const r = await api('POST', '/api/admin/import/categories', text);
+  showAlert('alert-categories', r?.ok ? `${r.inserted}件追加・${r.updated}件更新しました` : r?.error, r?.ok ? 'success' : 'error');
+  if (r?.ok) { allCategories = await api('GET', '/api/admin/categories'); renderCategories(); }
+  this.value = '';
+});
+
+// ---------------------------------------------------------------------------
+// スキルカード
+// ---------------------------------------------------------------------------
+function renderSkills() {
+  const tbody = document.getElementById('skills-tbody');
+  tbody.innerHTML = (allSkills || []).map(s => {
+    const st = (allSkillTypes||[]).find(t => t.id === s.skill_type_id);
+    return `<tr>
+      <td>${s.id}</td>
+      <td>${escHtml(s.name_ja)}</td>
+      <td>${escHtml(s.name_en)}</td>
+      <td>${escHtml(st?.name_ja||'')}</td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="openSkillModal(${s.id})">編集</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteSkill(${s.id})">削除</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+window.openSkillModal = function(id) {
+  const skill = id ? allSkills.find(s => s.id === id) : null;
+  const typeOpts = (allSkillTypes||[]).map(t =>
+    `<option value="${t.id}" ${skill?.skill_type_id===t.id?'selected':''}>${escHtml(t.name_ja)}</option>`
+  ).join('');
+  openModal(id ? 'スキルカード編集' : 'スキルカード新規作成', `
+    <div class="field-row"><label>名前（日本語）</label><input id="f-name-ja" value="${escHtml(skill?.name_ja||'')}"></div>
+    <div class="field-row"><label>名前（英語）</label><input id="f-name-en" value="${escHtml(skill?.name_en||'')}"></div>
+    <div class="field-row"><label>スキル区分</label><select id="f-skill-type">${typeOpts}</select></div>
+    <div class="field-row"><label>説明（日本語）</label><textarea id="f-desc-ja">${escHtml(skill?.description_ja||'')}</textarea></div>
+    <div class="field-row"><label>説明（英語）</label><textarea id="f-desc-en">${escHtml(skill?.description_en||'')}</textarea></div>
+  `, async () => {
+    const data = {
+      name_ja: document.getElementById('f-name-ja').value.trim(),
+      name_en: document.getElementById('f-name-en').value.trim(),
+      skill_type_id: Number(document.getElementById('f-skill-type').value),
+      description_ja: document.getElementById('f-desc-ja').value.trim() || null,
+      description_en: document.getElementById('f-desc-en').value.trim() || null,
+    };
+    if (!data.name_ja || !data.name_en) { alert('名前を入力してください'); return false; }
+    const r = id ? await api('PUT', `/api/admin/skills/${id}`, data) : await api('POST', '/api/admin/skills', data);
+    if (!r?.ok) return false;
+    allSkills = await api('GET', '/api/admin/skills');
+    renderSkills();
+    return true;
+  });
+};
+
+window.deleteSkill = async function(id) {
+  if (!confirm('削除しますか？')) return;
+  await api('DELETE', `/api/admin/skills/${id}`);
+  allSkills = await api('GET', '/api/admin/skills');
+  renderSkills();
+};
+
+document.getElementById('add-skill-btn').addEventListener('click', () => openSkillModal(null));
+
+document.getElementById('export-skills').addEventListener('click', () => {
+  const headers = 'id,name_ja,name_en,skill_type_id,description_ja,description_en';
+  const rows = (allSkills||[]).map(s => `${s.id},${s.name_ja},${s.name_en},${s.skill_type_id},${s.description_ja||''},${s.description_en||''}`);
+  downloadCsv('skills.csv', [headers, ...rows].join('\n'));
+});
+
+document.getElementById('import-skills').addEventListener('change', async function() {
+  const text = await this.files[0].text();
+  const r = await api('POST', '/api/admin/import/skills', text);
+  showAlert('alert-skills', r?.ok ? `${r.inserted}件追加・${r.updated}件更新しました` : r?.error, r?.ok ? 'success' : 'error');
+  if (r?.ok) { allSkills = await api('GET', '/api/admin/skills'); renderSkills(); }
+  this.value = '';
+});
+
+// ---------------------------------------------------------------------------
+// ミッションカード
+// ---------------------------------------------------------------------------
+function renderMissions() {
+  const tbody = document.getElementById('missions-tbody');
+  tbody.innerHTML = (allMissions || []).map(m => {
+    const mc = (allMissionCats||[]).find(c => c.id === m.mission_category_id);
+    return `<tr>
+      <td>${m.id}</td>
+      <td>${escHtml(m.name_ja)}</td>
+      <td>${escHtml(m.name_en)}</td>
+      <td>${escHtml(mc?.name_ja||'')}</td>
+      <td>${m.enabled ? '✓' : '✗'}</td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="openMissionModal(${m.id})">編集</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteMission(${m.id})">削除</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+window.openMissionModal = function(id) {
+  const mis = id ? allMissions.find(m => m.id === id) : null;
+  const catOpts = (allMissionCats||[]).map(c =>
+    `<option value="${c.id}" ${mis?.mission_category_id===c.id?'selected':''}>${escHtml(c.name_ja)}</option>`
+  ).join('');
+  openModal(id ? 'ミッションカード編集' : 'ミッションカード新規作成', `
+    <div class="field-row"><label>名前（日本語）</label><input id="f-name-ja" value="${escHtml(mis?.name_ja||'')}"></div>
+    <div class="field-row"><label>名前（英語）</label><input id="f-name-en" value="${escHtml(mis?.name_en||'')}"></div>
+    <div class="field-row"><label>ミッション区分</label><select id="f-mission-cat">${catOpts}</select></div>
+    <div class="field-row"><label>説明（日本語）</label><textarea id="f-desc-ja">${escHtml(mis?.description_ja||'')}</textarea></div>
+    <div class="field-row"><label>説明（英語）</label><textarea id="f-desc-en">${escHtml(mis?.description_en||'')}</textarea></div>
+    <div class="field-row"><label><input type="checkbox" id="f-enabled" ${mis?.enabled!==0?'checked':''}> 有効</label></div>
+  `, async () => {
+    const data = {
+      name_ja: document.getElementById('f-name-ja').value.trim(),
+      name_en: document.getElementById('f-name-en').value.trim(),
+      mission_category_id: Number(document.getElementById('f-mission-cat').value),
+      description_ja: document.getElementById('f-desc-ja').value.trim() || null,
+      description_en: document.getElementById('f-desc-en').value.trim() || null,
+      enabled: document.getElementById('f-enabled').checked ? 1 : 0,
+    };
+    if (!data.name_ja || !data.name_en) { alert('名前を入力してください'); return false; }
+    const r = id ? await api('PUT', `/api/admin/missions/${id}`, data) : await api('POST', '/api/admin/missions', data);
+    if (!r?.ok) return false;
+    allMissions = await api('GET', '/api/admin/missions');
+    renderMissions();
+    return true;
+  });
+};
+
+window.deleteMission = async function(id) {
+  if (!confirm('削除しますか？')) return;
+  await api('DELETE', `/api/admin/missions/${id}`);
+  allMissions = await api('GET', '/api/admin/missions');
+  renderMissions();
+};
+
+document.getElementById('add-mission-btn').addEventListener('click', () => openMissionModal(null));
+
+document.getElementById('export-missions').addEventListener('click', () => {
+  const headers = 'id,name_ja,name_en,mission_category_id,description_ja,description_en,enabled';
+  const rows = (allMissions||[]).map(m => `${m.id},${m.name_ja},${m.name_en},${m.mission_category_id},${m.description_ja||''},${m.description_en||''},${m.enabled}`);
+  downloadCsv('missions.csv', [headers, ...rows].join('\n'));
+});
+
+document.getElementById('import-missions').addEventListener('change', async function() {
+  const text = await this.files[0].text();
+  const r = await api('POST', '/api/admin/import/missions', text);
+  showAlert('alert-missions', r?.ok ? `${r.inserted}件追加・${r.updated}件更新しました` : r?.error, r?.ok ? 'success' : 'error');
+  if (r?.ok) { allMissions = await api('GET', '/api/admin/missions'); renderMissions(); }
+  this.value = '';
+});
+
+// ---------------------------------------------------------------------------
+// 配布比率
+// ---------------------------------------------------------------------------
+function updateRatioTotal() {
+  const s = parseInt(document.getElementById('skill-ratio').value) || 0;
+  const m = parseInt(document.getElementById('mission-ratio').value) || 0;
+  const el = document.getElementById('ratio-total');
+  el.textContent = s + m;
+  el.style.color = s + m === 100 ? '#86efac' : '#fca5a5';
+}
+document.getElementById('skill-ratio').addEventListener('input', updateRatioTotal);
+document.getElementById('mission-ratio').addEventListener('input', updateRatioTotal);
+
+document.getElementById('save-distribution-btn').addEventListener('click', async () => {
+  const s = parseInt(document.getElementById('skill-ratio').value);
+  const m = parseInt(document.getElementById('mission-ratio').value);
+  if (s + m !== 100) { showAlert('alert-distribution', 'スキルとミッションの合計は100にしてください'); return; }
+  const r = await api('PUT', '/api/admin/settings/distribution', { skillRatio: s, missionRatio: m });
+  showAlert('alert-distribution', r?.ok ? '保存しました' : r?.error, r?.ok ? 'success' : 'error');
+});
+
+// ---------------------------------------------------------------------------
+// スキル区分
+// ---------------------------------------------------------------------------
+function renderSkillTypes() {
+  const tbody = document.getElementById('skill-types-tbody');
+  tbody.innerHTML = (allSkillTypes || []).map(t => `<tr>
+    <td>${t.id}</td>
+    <td>${escHtml(t.name_ja)}</td>
+    <td>${escHtml(t.name_en)}</td>
+    <td>
+      <button class="btn btn-secondary btn-sm" onclick="openSkillTypeModal(${t.id})">編集</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteSkillType(${t.id})">削除</button>
+    </td>
+  </tr>`).join('');
+}
+
+window.openSkillTypeModal = function(id) {
+  const st = id ? allSkillTypes.find(t => t.id === id) : null;
+  openModal(id ? 'スキル区分編集' : 'スキル区分新規作成', `
+    <div class="field-row"><label>名前（日本語）</label><input id="f-name-ja" value="${escHtml(st?.name_ja||'')}"></div>
+    <div class="field-row"><label>名前（英語）</label><input id="f-name-en" value="${escHtml(st?.name_en||'')}"></div>
+  `, async () => {
+    const data = { name_ja: document.getElementById('f-name-ja').value.trim(), name_en: document.getElementById('f-name-en').value.trim() };
+    if (!data.name_ja || !data.name_en) { alert('名前を入力してください'); return false; }
+    const r = id ? await api('PUT', `/api/admin/skill-types/${id}`, data) : await api('POST', '/api/admin/skill-types', data);
+    if (!r?.ok) return false;
+    allSkillTypes = await api('GET', '/api/admin/skill-types');
+    renderSkillTypes();
+    return true;
+  });
+};
+window.deleteSkillType = async function(id) {
+  if (!confirm('削除しますか？')) return;
+  await api('DELETE', `/api/admin/skill-types/${id}`);
+  allSkillTypes = await api('GET', '/api/admin/skill-types');
+  renderSkillTypes();
+};
+document.getElementById('add-skill-type-btn').addEventListener('click', () => openSkillTypeModal(null));
+
+// ---------------------------------------------------------------------------
+// ミッション区分
+// ---------------------------------------------------------------------------
+function renderMissionCategories() {
+  const tbody = document.getElementById('mission-categories-tbody');
+  tbody.innerHTML = (allMissionCats || []).map(c => `<tr>
+    <td>${c.id}</td>
+    <td>${escHtml(c.name_ja)}</td>
+    <td>${escHtml(c.name_en)}</td>
+    <td>
+      <button class="btn btn-secondary btn-sm" onclick="openMissionCatModal(${c.id})">編集</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteMissionCat(${c.id})">削除</button>
+    </td>
+  </tr>`).join('');
+}
+
+window.openMissionCatModal = function(id) {
+  const mc = id ? allMissionCats.find(c => c.id === id) : null;
+  openModal(id ? 'ミッション区分編集' : 'ミッション区分新規作成', `
+    <div class="field-row"><label>名前（日本語）</label><input id="f-name-ja" value="${escHtml(mc?.name_ja||'')}"></div>
+    <div class="field-row"><label>名前（英語）</label><input id="f-name-en" value="${escHtml(mc?.name_en||'')}"></div>
+  `, async () => {
+    const data = { name_ja: document.getElementById('f-name-ja').value.trim(), name_en: document.getElementById('f-name-en').value.trim() };
+    if (!data.name_ja || !data.name_en) { alert('名前を入力してください'); return false; }
+    const r = id ? await api('PUT', `/api/admin/mission-categories/${id}`, data) : await api('POST', '/api/admin/mission-categories', data);
+    if (!r?.ok) return false;
+    allMissionCats = await api('GET', '/api/admin/mission-categories');
+    renderMissionCategories();
+    return true;
+  });
+};
+window.deleteMissionCat = async function(id) {
+  if (!confirm('削除しますか？')) return;
+  await api('DELETE', `/api/admin/mission-categories/${id}`);
+  allMissionCats = await api('GET', '/api/admin/mission-categories');
+  renderMissionCategories();
+};
+document.getElementById('add-mission-category-btn').addEventListener('click', () => openMissionCatModal(null));
+
+// ---------------------------------------------------------------------------
+// モーダル汎用制御
+// ---------------------------------------------------------------------------
+let modalSaveCallback = null;
+
+function openModal(title, bodyHtml, onSave) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = bodyHtml;
+  document.getElementById('modal-overlay').classList.add('open');
+  modalSaveCallback = onSave;
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  modalSaveCallback = null;
+}
+
+document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+
+document.getElementById('modal-save-btn').addEventListener('click', async () => {
+  if (!modalSaveCallback) return;
+  const ok = await modalSaveCallback();
+  if (ok) closeModal();
+});
+
+// ---------------------------------------------------------------------------
+// CSV ダウンロード
+// ---------------------------------------------------------------------------
+function downloadCsv(filename, content) {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+// ---------------------------------------------------------------------------
+// 起動
+// ---------------------------------------------------------------------------
+(async () => {
+  if (token) {
+    const ok = await checkAuth();
+    if (ok) {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('admin-screen').style.display = 'block';
+      loadAll();
+    } else {
+      token = '';
+      localStorage.removeItem('admin_token');
+    }
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+[Unit]
+Description=Career Collection Game (v2.0-B)
+Documentation=https://github.com/your-org/career-collection-game
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/career-collection-game
+
+# Docker Compose で起動・停止
+ExecStart=/usr/bin/docker compose up -d --remove-orphans
+ExecStop=/usr/bin/docker compose down
+
+# 起動失敗時のリトライ
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target
