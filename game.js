@@ -307,6 +307,10 @@ class GameClient {
         <div class="rank-num ${r.rank === 1 ? 'rank-1' : ''}">${r.rank}</div>
         <div class="rank-name">${escHtml(name)}${isMe ? ' 👤' : ''}</div>
         <div class="rank-score">${r.categoryCount} 職種</div>
+        <div class="download-btns">
+          <button class="btn-dl" data-player-id="${r.playerId}" data-fmt="csv">CSV ⬇</button>
+          <button class="btn-dl" data-player-id="${r.playerId}" data-fmt="md">MD ⬇</button>
+        </div>
       </div>`;
     }).join('');
 
@@ -322,10 +326,108 @@ class GameClient {
       location.href = '/';
     });
 
+    // ダウンロードボタンのイベント設定
+    app.querySelectorAll('.btn-dl').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const playerId = btn.dataset.playerId;
+        const fmt      = btn.dataset.fmt;
+        const player   = this.session && this.session.players.find(p => p.id === playerId);
+        if (!player) return;
+        const safeName = (player.name || playerId).replace(/[\\/:*?"<>|]/g, '_');
+        if (fmt === 'csv') {
+          const content  = this.generatePlayerCSV(player);
+          this.triggerDownload(content, `result_${safeName}.csv`, 'text/csv;charset=utf-8;');
+        } else {
+          const content  = this.generatePlayerMarkdown(player);
+          this.triggerDownload(content, `result_${safeName}.md`, 'text/markdown;charset=utf-8;');
+        }
+      });
+    });
+
     // チャットログクリア
     this.chatLog = [];
     const msgs = document.getElementById('chat-messages');
     if (msgs) msgs.innerHTML = '';
+  }
+
+  /** プレイヤーの結果をCSV文字列で返す */
+  generatePlayerCSV(player) {
+    const csvEsc = v => {
+      const s = (v == null ? '' : String(v));
+      return (s.includes(',') || s.includes('"') || s.includes('\n'))
+        ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = [
+      ['セクション', '種別', 'カード名', '説明'].map(csvEsc).join(','),
+    ];
+
+    const skillIds    = new Set((player.skillIds    || []).map(Number));
+    const missionIds  = new Set((player.missionIds  || []).map(Number));
+    const categoryIds = new Set((player.achievedCategoryIds || []).map(Number));
+
+    for (const card of this.skillsCache) {
+      if (!skillIds.has(Number(card.id))) continue;
+      lines.push(['獲得カード', 'スキル', card.name_ja, card.description_ja || ''].map(csvEsc).join(','));
+    }
+    for (const card of this.missionsCache) {
+      if (!missionIds.has(Number(card.id))) continue;
+      lines.push(['獲得カード', 'ミッション', card.name_ja, card.description_ja || ''].map(csvEsc).join(','));
+    }
+    for (const cat of this.categoriesCache) {
+      if (!categoryIds.has(Number(cat.id))) continue;
+      lines.push(['達成職種', '職種', cat.name_ja, cat.description_ja || ''].map(csvEsc).join(','));
+    }
+
+    return '\uFEFF' + lines.join('\r\n'); // BOM付きでExcel対応
+  }
+
+  /** プレイヤーの結果をMarkdown文字列で返す */
+  generatePlayerMarkdown(player) {
+    const mdEsc = v => (v == null ? '' : String(v)).replace(/\|/g, '\\|');
+
+    const skillIds    = new Set((player.skillIds    || []).map(Number));
+    const missionIds  = new Set((player.missionIds  || []).map(Number));
+    const categoryIds = new Set((player.achievedCategoryIds || []).map(Number));
+
+    const acquiredSkills   = this.skillsCache.filter(c => skillIds.has(Number(c.id)));
+    const acquiredMissions = this.missionsCache.filter(c => missionIds.has(Number(c.id)));
+    const achievedCats     = this.categoriesCache.filter(c => categoryIds.has(Number(c.id)));
+
+    const lines = [
+      `# ${player.name} さんのゲーム結果`,
+      '',
+      `## 獲得カード（スキル ${acquiredSkills.length}枚 / ミッション ${acquiredMissions.length}枚）`,
+      '',
+      '| 種別 | カード名 | 説明 |',
+      '|------|---------|------|',
+    ];
+
+    for (const card of acquiredSkills) {
+      lines.push(`| スキル | ${mdEsc(card.name_ja)} | ${mdEsc(card.description_ja || '')} |`);
+    }
+    for (const card of acquiredMissions) {
+      lines.push(`| ミッション | ${mdEsc(card.name_ja)} | ${mdEsc(card.description_ja || '')} |`);
+    }
+
+    lines.push('', `## 達成職種（${achievedCats.length}職種）`, '', '| 職種名 | 説明 |', '|--------|------|');
+    for (const cat of achievedCats) {
+      lines.push(`| ${mdEsc(cat.name_ja)} | ${mdEsc(cat.description_ja || '')} |`);
+    }
+
+    return lines.join('\n');
+  }
+
+  /** Blob経由でファイルダウンロードを起動する */
+  triggerDownload(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   onChatMessage({ playerId, playerName, text, sentAt }) {
